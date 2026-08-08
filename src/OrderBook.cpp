@@ -57,6 +57,75 @@ namespace
             return false;
         
         const OrderLocation loc = loc_it->second;
+
+        auto removeFrom = [ & ]( auto& book )
+        {
+            auto level_it = book.find( loc.price );
+            PriceLevel& level = level_it->second;
+            level.totalQuantity -= loc.it->remainingQuantity();
+            loc.it->cancel();
+            level.orders.erase( loc.it );
+
+            if ( level.orders.empty() )
+                book.erase( level_it );
+        };
+
+        if ( loc.side == Side::Buy )
+            removeFrom( bids_ );
+        else
+            removeFrom( asks_ );
+        
+        order_locations_.erase( loc_it );
+        return true;
+    }
+
+    std::optional< Price > OrderBook::bestBid() const
+    {
+        if ( bids_.empty() )
+            return std::nullopt;
+        return bids_.begin()->first;
+    }
+
+    std::optional< Price > OrderBook::bestAsk() const
+    {
+        if ( asks_.empty() )
+            return std::nullopt;
+        return asks_.begin()->first;
+    }
+
+    std::optional< Price > OrderBook::spread() const
+    {
+        const auto bid = bestBid();
+        const auto ask = bestAsk();
+        if ( !bid || !ask )
+            return std::nullopt;
+        return *ask - *bid;
+    }
+
+    std::vector< OrderBook::PriceLevelInfo > OrderBook::bidDepth( std::size_t depth ) const
+    {
+        std::vector< PriceLevelInfo > result;
+        result.reserve( std::min( depth, bids_.size() ) );
+        for ( auto const& [ price, level ] : bids_ )
+        {
+            if ( result.size() >= depth )
+                break;
+            result.push_back( PriceLevelInfo{ price, level.totalQuantity, level.orders.size() } );
+        }
+        return result;
+    }
+
+    std::vector< OrderBook::PriceLevelInfo > OrderBook::askDepth( std::size_t depth ) const
+    {
+        std::vector< PriceLevelInfo > result;
+        result.reserve( std::min( depth, asks_.size() ) );
+        for ( auto const& [ price, level ] : asks_ )
+        {
+            if ( result.size() >= depth )
+                break;
+            result.push_back( PriceLevelInfo{ price, level.totalQuantity, level.orders.size() } );
+        }
+        return result;
     }
 
 }
