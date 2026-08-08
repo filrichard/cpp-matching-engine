@@ -50,4 +50,13 @@ namespace
         return trades;
     }
 
+    bool OrderBook::cancelOrder( OrderId id )
+    {
+        auto loc_it = order_locations_.find( id );
+        if ( loc_it == order_locations_.end() )
+            return false;
+        
+        const OrderLocation loc = loc_it->second;
+    }
+
 }
