@@ -43,7 +43,7 @@ namespace
                     << " (" << level.orderCount << " orders)\n";
         }
     }
-
+}
     int main( void )
     {
         MatchingEngine engine;
@@ -81,5 +81,3 @@ namespace
 
         return 0;
     }
-
-}
