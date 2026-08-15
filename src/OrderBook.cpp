@@ -128,4 +128,143 @@ namespace
         return result;
     }
 
+    void OrderBook::matchAgainstAsks( Order& incoming, std::vector< Trade >& trades )
+    {
+        assert( incoming.side() == Side::Buy );
+
+        while ( incoming.remainingQuantity() > 0 && !asks_.empty() )
+        {
+            auto level_it = asks_.begin();
+            const Price level_price = level_it->first;
+
+            if ( incoming.isLimit() && incoming.price() < level_price )
+                break;
+            
+            PriceLevel& level = level_it->second;
+            auto& orders = level.orders;
+
+            while ( incoming.remainingQuantity() > 0 && !orders.empty() )
+            {
+                Order& resting = orders.front();
+                const Quantity fill_qty = std::min( incoming.remainingQuantity(), resting.remainingQuantity() );
+                incoming.fill( fill_qty );
+                resting.fill( fill_qty );
+                level.totalQuantity -= fill_qty;
+
+                trades.emplace_back( nextTradeId(), symbol_, level_price, fill_qty,
+                                 /*buy_order_id=*/incoming.id(),
+                                 /*sell_order_id=*/resting.id(),
+                                 /*buy_client_id=*/incoming.clientId(),
+                                 /*sell_client_id=*/resting.clientId(),
+                                 /*aggressor_side=*/incoming.side() );
+                
+                if ( resting.isFullyFilled() )
+                {
+                    const OrderId resting_id = resting.id();
+                    orders.pop_front();
+                    order_locations_.erase( resting_id );
+                }
+            }
+
+            if ( orders.empty() )
+                asks_.erase( level_it );
+
+        }
+    }
+
+    void OrderBook::matchAgainstBids( Order& incoming, std::vector< Trade >& trades )
+    {
+        assert( incoming.side() == Side::Sell );
+
+        while( incoming.remainingQuantity() > 0 && !bids_.empty() )
+        {
+            auto level_it = bids_.begin();
+            const Price level_price = level_it->first;
+
+            if ( incoming.isLimit() && incoming.price() > level_price )
+                break;
+            
+            PriceLevel& level = level_it->second;
+            auto& orders = level.orders;
+
+            while ( incoming.remainingQuantity() > 0 && !orders.empty() )
+            {
+                Order& resting = orders.front();
+                const Quantity fill_qty = std::min( incoming.remainingQuantity(), resting.remainingQuantity() );
+                incoming.fill( fill_qty );
+                resting.fill( fill_qty );
+                level.totalQuantity -= fill_qty;
+
+                trades.emplace_back( nextTradeId(), symbol_, level_price, fill_qty,
+                                 /*buy_order_id=*/resting.id(),
+                                 /*sell_order_id=*/incoming.id(),
+                                 /*buy_client_id=*/resting.clientId(),
+                                 /*sell_client_id=*/incoming.clientId(),
+                                 /*aggressor_side=*/incoming.side() );
+                
+                if ( resting.isFullyFilled() )
+                {
+                    const OrderId resting_id = resting.id();
+                    orders.pop_front();
+                    order_locations_.erase( resting_id );
+                }
+            }
+
+            if ( orders.empty() )
+                bids_.erase( level_it );
+
+        }
+    }
+
+    bool OrderBook::canFullyFill( const Order& order ) const
+    {
+        Quantity available = 0;
+        const Quantity needed = order.remainingQuantity();
+
+        if ( order.isBuy() )
+        {
+            for ( auto const& [ price, level ] : asks_ )
+            {
+                if ( order.isLimit() && order.price() < price )
+                    break;
+                available += level.totalQuantity;
+                if ( available >= needed )
+                    return true;
+            }
+        }
+        else
+        {
+            for ( auto const& [ price, level ] : bids_ )
+            {
+                if ( order.isLimit() && order.price() > price )
+                    break;
+                if ( available >= needed )
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    void OrderBook::restOrder( Order order )
+    {
+        const OrderId id = order.id();
+        const Side side = order.side();
+        const Price price = order.price();
+        const Quantity qty = order.remainingQuantity();
+
+        auto insert = [ & ]( auto& book )
+        {
+            auto& level = book[ price ];
+            level.orders.push_back( std::move( order ) );
+            level.totalQuantity += qty;
+            order_locations_.emplace( id, OrderLocation{ side, price, std::prev( level.orders.end() ) } );
+        };
+
+        if ( side == Side::Buy )
+            insert( bids_ );
+        else
+            insert( asks_ );
+    }
+
 }
