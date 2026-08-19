@@ -6,11 +6,17 @@
 namespace matching_engine
 {
     // Identifiers
+
     using OrderId  = std::uint64_t;
     using ClientId = std::uint64_t;
     using TradeId  = std::uint64_t;
 
     // Quantities and Prices
+    /*
+    Prices are represented in fixed point ticks (1 tick = $0.0001) instead
+    of relying on a floating point type. This is to avoid rounding errors
+    and make price comparisons exact
+    */
     using Price    = std::uint64_t;
     using Quantity = std::uint64_t;
 
