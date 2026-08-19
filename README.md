@@ -4,7 +4,7 @@
 [![macOS CI](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-macos.yml/badge.svg)](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-macos.yml)
 [![Windows CI](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-windows.yml/badge.svg)](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-windows.yml)
 
-A learning project implementing a limit order book and matching engine in modern C++.
+A fintech project implementing a limit order book and matching engine in modern C++.
 
 The engine supports:
 
