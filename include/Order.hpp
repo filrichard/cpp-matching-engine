@@ -8,6 +8,12 @@
 
 namespace matching_engine
 {
+
+/*
+Represents a single order in the matching engine
+Order owns its identity and quantity/status bookkeeping
+Order's priority in relation to other orders is OrderBook's reponsibility
+*/
 class Order
 {
     private:
@@ -87,10 +93,15 @@ class Order
 
         bool isFullyFilled() const noexcept { return remaining_quantity_ == 0; }
 
+        // True if the order can still participate in matching / rest on the book
         bool isActive() const noexcept { return status_ == OrderStatus::New 
                                              || status_ == OrderStatus::PartiallyFilled; }
         
         // Setters
+        /*
+        Apply a fill of qty against this order. Throws if qty exceeds
+        the remaining quantity or the order is no longer active
+        */
         void fill( Quantity qty )
         {
             if ( !isActive() )
@@ -100,14 +111,17 @@ class Order
             remaining_quantity_ -= qty;
             status_ = isFullyFilled() ? OrderStatus::Filled : OrderStatus::PartiallyFilled;
         }
-
+        // Cancel the order. Throws if it's already in a terminal state
         void cancel()
         {
             if ( !isActive() )
                 throw std::logic_error( "Cannot cancel an inactive order" );
             status_ = OrderStatus::Cancelled;
         }
-
+        /*
+        Reject the order before it ever rests
+        on the book. Only valid from the New state
+        */
         void reject()
         {
             if ( status_ != OrderStatus::New )
@@ -121,7 +135,10 @@ class Order
                 throw std::logic_error( "Cannot expire an inactive order" );
             status_ = OrderStatus::Expired;
         }
-
+        /*
+        Identity based equality - two Orders are the same order
+        if they share the same id
+        */
         friend bool operator==( const Order& lhs, const Order& rhs ) noexcept
         {
             return lhs.id_ == rhs.id_;
