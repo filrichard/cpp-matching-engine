@@ -9,6 +9,15 @@
 namespace matching_engine
 {
 
+/*
+An immutable record of a single match between two orders.
+
+Contains no setters and no mutation methods.
+
+Via convention, `price` is always the resting order's price, not the incoming
+order's price. `OrderBook` is reponsible for upholding this when constructing
+Trades. This type only stores the result
+*/
 class Trade 
 {
 private:
@@ -66,6 +75,7 @@ public:
     ClientId buyClientId() const noexcept { return buy_client_id_; }
     ClientId sellClientId() const noexcept { return sell_client_id_; }
 
+    // Which side initiated the trade as opposed to the resting/passive side.
     Side aggressorSide() const noexcept { return aggressor_side_; }
 
     TimeStamp timestamp() const noexcept { return timestamp_; }
