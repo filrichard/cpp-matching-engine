@@ -90,7 +90,7 @@ These are open items, not oversights — each was a deliberate scoping decision 
 This project uses [CMake Presets](https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html) to avoid a common footgun: a plain `-DCMAKE_BUILD_TYPE=Release` doesn't reliably produce an optimized build. It has no effect at all on multi-config generators (Visual Studio, Xcode), and on single-config generators it's silently ignored if the build directory already has a different build type cached — which is exactly what happens if an IDE previously configured it as Debug. The presets sidestep both problems by giving `debug` and `release` their own dedicated, pre-pinned build directories.
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/filrichard/cpp-matching-engine.git
 cd cpp-matching-engine
 
 cmake --preset release
