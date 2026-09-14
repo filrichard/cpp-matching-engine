@@ -1,0 +1,153 @@
+---
+# Custom C++ formatting style for the C++ Matching Engine project.
+#
+# Requires a modern clang-format with SpacesInParens (clang-format 17+).
+
+BasedOnStyle: LLVM
+Language: Cpp
+
+# ---------------------------------------------------------------------------
+# Indentation
+# ---------------------------------------------------------------------------
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# ---------------------------------------------------------------------------
+# Braces
+#
+# Opening braces are put on their own line:
+#
+# void foo()
+# {
+#     ...
+# }
+#
+# if ( condition )
+# {
+#     ...
+# }
+# ---------------------------------------------------------------------------
+BreakBeforeBraces: Custom
+
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: Always
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  BeforeWhile: true
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+
+# ---------------------------------------------------------------------------
+# Parentheses
+#
+# Your style:
+#     foo( x )
+#     if ( condition )
+#     void foo( int x )
+#
+# but:
+#     foo()
+#     void foo()
+# ---------------------------------------------------------------------------
+SpacesInParens: Custom
+SpacesInParensOptions:
+  ExceptDoubleParentheses: false
+  InConditionalStatements: true
+  InCStyleCasts: true
+  InEmptyParentheses: false
+  Other: true
+
+# Space before non-empty parentheses, including function calls:
+#     foo( x )
+#     if ( condition )
+#     while ( condition )
+#
+# Empty parentheses remain:
+#     foo()
+SpaceBeforeParens: NonEmptyParentheses
+
+# ---------------------------------------------------------------------------
+# Template arguments
+#
+#     std::vector< Trade >
+#     std::atomic< TradeId >
+# ---------------------------------------------------------------------------
+SpacesInAngles: Always
+
+# ---------------------------------------------------------------------------
+# Pointers / references
+#
+#     const std::string& symbol
+#     OrderBook* book
+# ---------------------------------------------------------------------------
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# ---------------------------------------------------------------------------
+# Line breaking
+# ---------------------------------------------------------------------------
+ColumnLimit: 100
+AlignAfterOpenBracket: Align
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+# Keep normal function bodies expanded rather than collapsed.
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Empty
+
+# Do not create one-line "if (...) statement;" forms.
+# Existing brace-less single-statement ifs remain brace-less because
+# InsertBraces is disabled.
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+InsertBraces: false
+
+# ---------------------------------------------------------------------------
+# switch / case
+# ---------------------------------------------------------------------------
+IndentCaseLabels: true
+IndentGotoLabels: false
+
+# ---------------------------------------------------------------------------
+# Initializers
+#
+# Keep C++11 initializer syntax rather than converting it to another style.
+# ---------------------------------------------------------------------------
+Cpp11BracedListStyle: true
+SpaceBeforeCpp11BracedList: false
+
+# ---------------------------------------------------------------------------
+# Operators / assignments
+# ---------------------------------------------------------------------------
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCtorInitializerColon: false
+
+# ---------------------------------------------------------------------------
+# Includes
+#
+# Preserve the blank-line grouping visible in the source while sorting
+# includes within their existing groups.
+# ---------------------------------------------------------------------------
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+
+# ---------------------------------------------------------------------------
+# Comments
+# ---------------------------------------------------------------------------
+ReflowComments: true
+SpacesBeforeTrailingComments: 3
+
+# Empty blocks use a visible space where clang-format applies this setting.
+SpaceInEmptyBlock: true
