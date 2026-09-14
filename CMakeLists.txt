@@ -34,3 +34,8 @@ if(MATCHING_ENGINE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+option(MATCHING_ENGINE_BUILD_BENCHMARKS "Build the benchmark suite" ON)
+if(MATCHING_ENGINE_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()

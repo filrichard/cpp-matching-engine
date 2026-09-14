@@ -27,6 +27,9 @@ namespace
     {
         std::vector< Trade > trades;
 
+        if ( order_locations_.contains( order.id() ) )
+            throw std::invalid_argument( "Duplicate OrderID submitted while still active" );
+
         if ( order.timeInForce() == TimeInForce::FOK && !canFullyFill( order ) )
         {
             order.reject();
