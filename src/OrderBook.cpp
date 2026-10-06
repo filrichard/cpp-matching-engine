@@ -241,6 +241,9 @@ namespace
             {
                 if ( order.isLimit() && order.price() > price )
                     break;
+
+                available += level.totalQuantity;
+
                 if ( available >= needed )
                     return true;
             }
