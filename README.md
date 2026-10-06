@@ -113,7 +113,7 @@ Registers a symbol, rests a couple of sell orders, submits a crossing buy that s
 ctest --preset release
 ```
 
-25 test cases (Catch2 v3, fetched via `FetchContent`) covering:
+26 test cases (Catch2 v3, fetched via `FetchContent`) covering:
 
 - Basic matching: resting, full/partial fills, price-time (FIFO) priority, multi-level sweeps
 - Limit orders not matching through their own price limit
