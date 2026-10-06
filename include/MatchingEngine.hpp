@@ -28,6 +28,9 @@ public:
     struct SubmitResult
     {
         OrderId orderId;
+        OrderStatus status;
+        Quantity filledQuantity;
+        Quantity remainingQuantity;
         std::vector< Trade > trades;
     };
 
