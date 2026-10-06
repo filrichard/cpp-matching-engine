@@ -5,11 +5,12 @@
 #include "Types.hpp"
 
 #include <cstddef>
-#include <list>
 #include <map>
+#include <memory_resource>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace matching_engine
@@ -27,25 +28,41 @@ class OrderBook
 private:
     /*
     One price level. Orders in strict FIFO (time-priority) order, plus
-    a running total so depth queries don't need to walk the list
+    a running total so depth queries don't need to walk the queue.
     */
     struct PriceLevel
     {
-        std::list< Order > orders;
+        struct OrderNode
+        {
+            explicit OrderNode( Order order ) : order( std::move( order ) ) {}
+
+            Order order;
+            OrderNode* previous = nullptr;
+            OrderNode* next = nullptr;
+        };
+
+        OrderNode* head = nullptr;
+        OrderNode* tail = nullptr;
         Quantity totalQuantity = 0;
+        std::size_t orderCount = 0;
+
+        bool empty() const noexcept { return head == nullptr; }
+
+        void pushBack( OrderNode* node ) noexcept;
+        void unlink( OrderNode* node ) noexcept;
     };
 
     /*
     Where a resting order lives, so cancelOrder() doesn't need to
-    search either side of the book. The list iterator stays valid
-    for the order's entire lifetime via std::list's guarantees.
+    search either side of the book. The node address stays valid for
+    the order's entire lifetime in the order-node pool.
     Makes cancellation O(1), aside from the O(log n) price-level lookup/erase
     */
     struct OrderLocation
     {
         Side side;
         Price price;
-        std::list< Order >::iterator it;
+        PriceLevel::OrderNode* node;
     };
 
     // Bids sorted best-first (highest price) so begin() is always top-of-book
@@ -81,11 +98,15 @@ private:
     order should rest
     */
     void restOrder( Order order );
+    PriceLevel::OrderNode* allocateNode( Order order );
+    void releaseNode( PriceLevel::OrderNode* node ) noexcept;
+    void clearOrders() noexcept;
 
     std::string symbol_;
     BidMap bids_;
     AskMap asks_;
     std::unordered_map< OrderId, OrderLocation > order_locations_;
+    std::pmr::unsynchronized_pool_resource order_node_pool_;
 
 public:
     // Complete outcome of processing one incoming order. The order itself is
@@ -111,6 +132,12 @@ public:
     };
 
     explicit OrderBook( std::string symbol );
+    ~OrderBook();
+
+    OrderBook( const OrderBook& ) = delete;
+    OrderBook& operator=( const OrderBook& ) = delete;
+    OrderBook( OrderBook&& ) = delete;
+    OrderBook& operator=( OrderBook&& ) = delete;
 
     /*
     Submits a new order. Attempts to match it immediately against the
