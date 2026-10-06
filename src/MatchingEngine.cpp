@@ -11,7 +11,7 @@ void MatchingEngine::addSymbol( std::string symbol )
     if ( books_.contains( symbol ) )
         throw std::invalid_argument( "Symbol already registered: " );
     
-    books_.emplace( symbol, OrderBook( symbol ) );
+    books_.try_emplace( symbol, symbol );
 }
 
 bool MatchingEngine::hasSymbol( const std::string& symbol ) const
