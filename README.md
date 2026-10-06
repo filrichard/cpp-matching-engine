@@ -45,15 +45,19 @@ std::map< Price, PriceLevel, std::greater< Price > > bids_;  // best (highest) p
 std::map< Price, PriceLevel, std::less< Price > >    asks_;  // best (lowest) price first
 ```
 
-where each `PriceLevel` is a `std::list<Order>` in strict FIFO order (time priority within a price). A side index —
+where each `PriceLevel` is a private intrusive FIFO queue in strict time order. Its
+nodes are allocated from a reusable per-book pool, and each node carries its own
+previous/next links. A side index —
 
 ```cpp
 std::unordered_map< OrderId, OrderLocation > order_locations_;
 ```
 
-— maps an `OrderId` directly to its side, price, and `std::list` iterator, so `cancelOrder()` doesn't need to search either side of the book. This works because `std::list` iterators stay valid for the lifetime of the element, even as other orders are inserted or removed elsewhere in the list.
+— maps an `OrderId` directly to its side, price, and stable queue-node address, so
+`cancelOrder()` doesn't need to search either side of the book. Nodes remain valid
+until their order is filled or cancelled.
 
-This isn't the fastest possible structure — an intrusive/lock-free layout would beat it — but it's a deliberate tradeoff: `O(log n)` insert, `O(1)` cancel (plus `O(log n)` if a price level empties out), and code that stays easy to reason about. See [Benchmarks](#benchmarks) for what this actually costs in practice.
+This is still a single-threaded, clarity-first design: `O(log n)` price-level lookup or creation, `O(1)` FIFO link/unlink, and `O(1)` cancellation after the index lookup (plus `O(log n)` if a level empties). The reusable node pool removes repeated per-order heap allocation after warm-up. See [Benchmarks](#benchmarks) for measurement guidance.
 
 ### Key design decisions
 
@@ -134,15 +138,15 @@ Built with [Google Benchmark](https://github.com/google/benchmark) (also fetched
 
 | Benchmark | What it isolates |
 |---|---|
-| `RestingInsert` (depth 10 → 10,000) | Cost of adding a new, non-crossing price level — `std::map` node allocation + insert |
+| `RestingInsert` (depth 10 → 10,000) | Cost of adding a non-crossing order — price-level lookup/creation plus order-node pool checkout |
 | `SingleLevelMatch` | Pure matching-loop + `Trade` construction cost, no map/list mutation |
 | `SweepLevels` (1 → 1,000 levels) | Cost of one aggressive order consuming N price levels — the worst-case latency path |
-| `Cancel` | `unordered_map` lookup + `list::erase` + level cleanup |
+| `Cancel` | `unordered_map` lookup + intrusive unlink + level cleanup |
 | `MatchingEngine_SubmitNonCrossing` | Routing/id-assignment overhead on top of raw `OrderBook::addOrder()` |
 
-### Sample results
+### Historical sample results
 
-Measured on a 10-core Apple Silicon Mac (M1 Pro), 10 repetitions, coefficient of variation under 2% on every benchmark:
+Measured before the intrusive-queue rewrite on a 10-core Apple Silicon Mac (M1 Pro), 10 repetitions, coefficient of variation under 2% on every benchmark. Re-run the benchmarks on your target machine before using these figures for comparison:
 
 | Benchmark | Median |
 |---|---|
