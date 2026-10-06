@@ -11,7 +11,7 @@ void MatchingEngine::addSymbol( std::string symbol )
     if ( books_.contains( symbol ) )
         throw std::invalid_argument( "Symbol already registered: " );
     
-    books_.emplace( symbol, OrderBook( symbol ) );
+    books_.try_emplace( symbol, symbol );
 }
 
 bool MatchingEngine::hasSymbol( const std::string& symbol ) const
@@ -42,10 +42,11 @@ MatchingEngine::SubmitResult MatchingEngine::submitLimitOrder( ClientId clientId
     const OrderId id = nextOrderId();
 
     Order order = Order::makeLimit( id, clientId, symbol, side, price, quantity, tif );
-    std::vector< Trade > trades = targetBook.addOrder( std::move( order ) );
+    auto result = targetBook.executeOrder( std::move( order ) );
 
-    notify( trades );
-    return SubmitResult{ id, std::move( trades ) };
+    notify( result.trades );
+    return SubmitResult{ id, result.status, result.filledQuantity,
+                         result.remainingQuantity, std::move( result.trades ) };
 }
 
 MatchingEngine::SubmitResult MatchingEngine::submitMarketOrder( ClientId clientId,
@@ -58,10 +59,11 @@ MatchingEngine::SubmitResult MatchingEngine::submitMarketOrder( ClientId clientI
     const OrderId id = nextOrderId();
 
     Order order = Order::makeMarket( id, clientId, symbol, side, quantity, tif );
-    std::vector< Trade > trades = targetBook.addOrder( std::move( order ) );
+    auto result = targetBook.executeOrder( std::move( order ) );
 
-    notify( trades );
-    return SubmitResult{ id, std::move( trades ) };
+    notify( result.trades );
+    return SubmitResult{ id, result.status, result.filledQuantity,
+                         result.remainingQuantity, std::move( result.trades ) };
 }
 
 bool MatchingEngine::cancelOrder( const std::string& symbol, OrderId id )

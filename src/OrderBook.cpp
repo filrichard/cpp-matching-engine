@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <memory>
 
 namespace matching_engine
 {
@@ -21,9 +22,44 @@ namespace
 }
 
     OrderBook::OrderBook( std::string symbol ) : symbol_( std::move( symbol ) ) {}
-    
 
-    std::vector< Trade > OrderBook::addOrder( Order order )
+    OrderBook::~OrderBook()
+    {
+        clearOrders();
+    }
+
+    void OrderBook::PriceLevel::pushBack( OrderNode* node ) noexcept
+    {
+        node->previous = tail;
+        node->next = nullptr;
+
+        if ( tail )
+            tail->next = node;
+        else
+            head = node;
+
+        tail = node;
+        ++orderCount;
+    }
+
+    void OrderBook::PriceLevel::unlink( OrderNode* node ) noexcept
+    {
+        if ( node->previous )
+            node->previous->next = node->next;
+        else
+            head = node->next;
+
+        if ( node->next )
+            node->next->previous = node->previous;
+        else
+            tail = node->previous;
+
+        node->previous = nullptr;
+        node->next = nullptr;
+        --orderCount;
+    }
+
+    OrderBook::AddOrderResult OrderBook::executeOrder( Order order )
     {
         std::vector< Trade > trades;
 
@@ -33,7 +69,8 @@ namespace
         if ( order.timeInForce() == TimeInForce::FOK && !canFullyFill( order ) )
         {
             order.reject();
-            return trades;
+            return AddOrderResult{ order.status(), order.filledQuantity(),
+                                   order.remainingQuantity(), std::move( trades ) };
         }
 
         if ( order.isBuy() )
@@ -48,9 +85,22 @@ namespace
               order.timeInForce() == TimeInForce::Day );
 
             if ( restsOnBook )
+            {
+                const AddOrderResult result{ order.status(), order.filledQuantity(),
+                                             order.remainingQuantity(), std::move( trades ) };
                 restOrder( std::move( order ) );
+                return result;
+            }
+            else
+                order.cancel();
         }
-        return trades;
+        return AddOrderResult{ order.status(), order.filledQuantity(),
+                               order.remainingQuantity(), std::move( trades ) };
+    }
+
+    std::vector< Trade > OrderBook::addOrder( Order order )
+    {
+        return executeOrder( std::move( order ) ).trades;
     }
 
     bool OrderBook::cancelOrder( OrderId id )
@@ -64,12 +114,13 @@ namespace
         auto removeFrom = [ & ]( auto& book )
         {
             auto level_it = book.find( loc.price );
+            assert( level_it != book.end() );
             PriceLevel& level = level_it->second;
-            level.totalQuantity -= loc.it->remainingQuantity();
-            loc.it->cancel();
-            level.orders.erase( loc.it );
+            level.totalQuantity -= loc.node->order.remainingQuantity();
+            loc.node->order.cancel();
+            level.unlink( loc.node );
 
-            if ( level.orders.empty() )
+            if ( level.empty() )
                 book.erase( level_it );
         };
 
@@ -79,6 +130,7 @@ namespace
             removeFrom( asks_ );
         
         order_locations_.erase( loc_it );
+        releaseNode( loc.node );
         return true;
     }
 
@@ -113,7 +165,7 @@ namespace
         {
             if ( result.size() >= depth )
                 break;
-            result.push_back( PriceLevelInfo{ price, level.totalQuantity, level.orders.size() } );
+            result.push_back( PriceLevelInfo{ price, level.totalQuantity, level.orderCount } );
         }
         return result;
     }
@@ -126,7 +178,7 @@ namespace
         {
             if ( result.size() >= depth )
                 break;
-            result.push_back( PriceLevelInfo{ price, level.totalQuantity, level.orders.size() } );
+            result.push_back( PriceLevelInfo{ price, level.totalQuantity, level.orderCount } );
         }
         return result;
     }
@@ -144,11 +196,11 @@ namespace
                 break;
             
             PriceLevel& level = level_it->second;
-            auto& orders = level.orders;
 
-            while ( incoming.remainingQuantity() > 0 && !orders.empty() )
+            while ( incoming.remainingQuantity() > 0 && !level.empty() )
             {
-                Order& resting = orders.front();
+                PriceLevel::OrderNode* node = level.head;
+                Order& resting = node->order;
                 const Quantity fill_qty = std::min( incoming.remainingQuantity(), resting.remainingQuantity() );
                 incoming.fill( fill_qty );
                 resting.fill( fill_qty );
@@ -164,12 +216,13 @@ namespace
                 if ( resting.isFullyFilled() )
                 {
                     const OrderId resting_id = resting.id();
-                    orders.pop_front();
                     order_locations_.erase( resting_id );
+                    level.unlink( node );
+                    releaseNode( node );
                 }
             }
 
-            if ( orders.empty() )
+            if ( level.empty() )
                 asks_.erase( level_it );
 
         }
@@ -188,11 +241,11 @@ namespace
                 break;
             
             PriceLevel& level = level_it->second;
-            auto& orders = level.orders;
 
-            while ( incoming.remainingQuantity() > 0 && !orders.empty() )
+            while ( incoming.remainingQuantity() > 0 && !level.empty() )
             {
-                Order& resting = orders.front();
+                PriceLevel::OrderNode* node = level.head;
+                Order& resting = node->order;
                 const Quantity fill_qty = std::min( incoming.remainingQuantity(), resting.remainingQuantity() );
                 incoming.fill( fill_qty );
                 resting.fill( fill_qty );
@@ -208,12 +261,13 @@ namespace
                 if ( resting.isFullyFilled() )
                 {
                     const OrderId resting_id = resting.id();
-                    orders.pop_front();
                     order_locations_.erase( resting_id );
+                    level.unlink( node );
+                    releaseNode( node );
                 }
             }
 
-            if ( orders.empty() )
+            if ( level.empty() )
                 bids_.erase( level_it );
 
         }
@@ -241,6 +295,9 @@ namespace
             {
                 if ( order.isLimit() && order.price() > price )
                     break;
+
+                available += level.totalQuantity;
+
                 if ( available >= needed )
                     return true;
             }
@@ -258,16 +315,72 @@ namespace
 
         auto insert = [ & ]( auto& book )
         {
-            auto& level = book[ price ];
-            level.orders.push_back( std::move( order ) );
-            level.totalQuantity += qty;
-            order_locations_.emplace( id, OrderLocation{ side, price, std::prev( level.orders.end() ) } );
+            auto [ level_it, created ] = book.try_emplace( price );
+            PriceLevel& level = level_it->second;
+            PriceLevel::OrderNode* node = nullptr;
+
+            try
+            {
+                node = allocateNode( std::move( order ) );
+                const auto [ location_it, inserted ] =
+                    order_locations_.emplace( id, OrderLocation{ side, price, node } );
+                if ( !inserted )
+                    throw std::logic_error( "Duplicate OrderID submitted while still active" );
+
+                (void)location_it;
+                level.pushBack( node );
+                level.totalQuantity += qty;
+            }
+            catch ( ... )
+            {
+                if ( node )
+                    releaseNode( node );
+                if ( created && level.empty() )
+                    book.erase( level_it );
+                throw;
+            }
         };
 
         if ( side == Side::Buy )
             insert( bids_ );
         else
             insert( asks_ );
+    }
+
+    OrderBook::PriceLevel::OrderNode* OrderBook::allocateNode( Order order )
+    {
+        void* storage = order_node_pool_.allocate( sizeof( PriceLevel::OrderNode ),
+                                                   alignof( PriceLevel::OrderNode ) );
+        return std::construct_at( static_cast< PriceLevel::OrderNode* >( storage ), std::move( order ) );
+    }
+
+    void OrderBook::releaseNode( PriceLevel::OrderNode* node ) noexcept
+    {
+        std::destroy_at( node );
+        order_node_pool_.deallocate( node, sizeof( PriceLevel::OrderNode ),
+                                    alignof( PriceLevel::OrderNode ) );
+    }
+
+    void OrderBook::clearOrders() noexcept
+    {
+        auto clearSide = [ this ]( auto& book ) noexcept
+        {
+            for ( auto& [ price, level ] : book )
+            {
+                auto* node = level.head;
+                while ( node )
+                {
+                    auto* next = node->next;
+                    releaseNode( node );
+                    node = next;
+                }
+            }
+            book.clear();
+        };
+
+        clearSide( bids_ );
+        clearSide( asks_ );
+        order_locations_.clear();
     }
 
 }
