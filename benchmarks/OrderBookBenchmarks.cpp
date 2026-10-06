@@ -116,9 +116,9 @@ static void BM_OrderBook_SweepLevels ( benchmark::State& state )
 BENCHMARK ( BM_OrderBook_SweepLevels )->Arg ( 1 )->Arg ( 10 )->Arg ( 100 )->Arg ( 1'000 );
 
 // ── Cancel ───────────────────────────────────────────────────────────────
-// Cost of removing a resting order by id: an unordered_map lookup, a
-// std::list erase, and (since each order here is alone at its price) a
-// std::map level erase.
+// Cost of removing a resting order by id: an unordered_map lookup, an
+// intrusive-queue unlink, and (since each order here is alone at its price)
+// a std::map level erase.
 static void BM_OrderBook_Cancel ( benchmark::State& state )
 {
     OrderBook book ( "BENCH" );
