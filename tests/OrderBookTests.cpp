@@ -175,6 +175,36 @@ TEST_CASE ( "OrderBook: FOK order matches fully when liquidity is sufficient", "
     CHECK ( *book.bestAsk() == 101 );
 }
 
+TEST_CASE ( "OrderBook: sell FOK order matches fully when bids are sufficient", "[orderbook][tif]" )
+{
+    OrderBook book ( "TEST" );
+    book.addOrder ( Order::makeLimit ( 1, kClientA, "TEST", Side::Buy, 101, 5 ) );
+    book.addOrder ( Order::makeLimit ( 2, kClientA, "TEST", Side::Buy, 100, 5 ) );
+
+    auto trades = book.addOrder (
+        Order::makeLimit ( 3, kClientB, "TEST", Side::Sell, 100, 10, TimeInForce::FOK ) );
+
+    REQUIRE ( trades.size() == 2 );
+    CHECK ( trades[0].price() == 101 );
+    CHECK ( trades[1].price() == 100 );
+    CHECK ( book.empty() );
+}
+
+TEST_CASE ( "OrderBook: sell FOK order leaves the book unchanged when bids are insufficient",
+            "[orderbook][tif]" )
+{
+    OrderBook book ( "TEST" );
+    book.addOrder ( Order::makeLimit ( 1, kClientA, "TEST", Side::Buy, 100, 5 ) );
+
+    auto trades = book.addOrder (
+        Order::makeLimit ( 2, kClientB, "TEST", Side::Sell, 100, 10, TimeInForce::FOK ) );
+
+    CHECK ( trades.empty() );
+    auto depth = book.bidDepth ( 5 );
+    REQUIRE ( depth.size() == 1 );
+    CHECK ( depth.front().totalQuantity == 5 );
+}
+
 // ── Market orders ───────────────────────────────────────────────────────
 
 TEST_CASE ( "OrderBook: market order matches without needing a price and never rests",
@@ -305,6 +335,31 @@ TEST_CASE ( "MatchingEngine: submitted orders are assigned distinct, increasing 
     auto second = engine.submitLimitOrder ( kClientA, "AAPL", Side::Buy, 100, 10 );
 
     CHECK ( second.orderId > first.orderId );
+}
+
+TEST_CASE ( "MatchingEngine: submit result reports the final order outcome", "[engine]" )
+{
+    MatchingEngine engine;
+    engine.addSymbol ( "AAPL" );
+
+    auto resting = engine.submitLimitOrder ( kClientA, "AAPL", Side::Buy, 100, 10 );
+    CHECK ( resting.status == OrderStatus::New );
+    CHECK ( resting.filledQuantity == 0 );
+    CHECK ( resting.remainingQuantity == 10 );
+
+    auto ioc = engine.submitLimitOrder (
+        kClientB, "AAPL", Side::Sell, 100, 15, TimeInForce::IOC );
+    CHECK ( ioc.status == OrderStatus::Cancelled );
+    CHECK ( ioc.filledQuantity == 10 );
+    CHECK ( ioc.remainingQuantity == 5 );
+    REQUIRE ( ioc.trades.size() == 1 );
+
+    auto fok = engine.submitLimitOrder (
+        kClientB, "AAPL", Side::Sell, 100, 1, TimeInForce::FOK );
+    CHECK ( fok.status == OrderStatus::Rejected );
+    CHECK ( fok.filledQuantity == 0 );
+    CHECK ( fok.remainingQuantity == 1 );
+    CHECK ( fok.trades.empty() );
 }
 
 TEST_CASE ( "MatchingEngine: routes orders to the correct symbol's book", "[engine]" )

@@ -23,7 +23,7 @@ namespace
     OrderBook::OrderBook( std::string symbol ) : symbol_( std::move( symbol ) ) {}
     
 
-    std::vector< Trade > OrderBook::addOrder( Order order )
+    OrderBook::AddOrderResult OrderBook::executeOrder( Order order )
     {
         std::vector< Trade > trades;
 
@@ -33,7 +33,8 @@ namespace
         if ( order.timeInForce() == TimeInForce::FOK && !canFullyFill( order ) )
         {
             order.reject();
-            return trades;
+            return AddOrderResult{ order.status(), order.filledQuantity(),
+                                   order.remainingQuantity(), std::move( trades ) };
         }
 
         if ( order.isBuy() )
@@ -48,9 +49,22 @@ namespace
               order.timeInForce() == TimeInForce::Day );
 
             if ( restsOnBook )
+            {
+                const AddOrderResult result{ order.status(), order.filledQuantity(),
+                                             order.remainingQuantity(), std::move( trades ) };
                 restOrder( std::move( order ) );
+                return result;
+            }
+            else
+                order.cancel();
         }
-        return trades;
+        return AddOrderResult{ order.status(), order.filledQuantity(),
+                               order.remainingQuantity(), std::move( trades ) };
+    }
+
+    std::vector< Trade > OrderBook::addOrder( Order order )
+    {
+        return executeOrder( std::move( order ) ).trades;
     }
 
     bool OrderBook::cancelOrder( OrderId id )
