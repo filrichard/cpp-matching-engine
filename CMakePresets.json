@@ -17,6 +17,16 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "sanitizers",
+            "displayName": "Debug with ASan + UBSan",
+            "binaryDir": "${sourceDir}/build/sanitizers",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "MATCHING_ENGINE_ENABLE_SANITIZERS": "ON",
+                "MATCHING_ENGINE_BUILD_BENCHMARKS": "OFF"
+            }
         }
     ],
     "buildPresets": [
@@ -29,6 +39,11 @@
             "name": "release",
             "configurePreset": "release",
             "configuration": "Release"
+        },
+        {
+            "name": "sanitizers",
+            "configurePreset": "sanitizers",
+            "configuration": "Debug"
         }
     ],
     "testPresets": [
@@ -42,6 +57,12 @@
             "name": "release",
             "configurePreset": "release",
             "configuration": "Release",
+            "output": { "outputOnFailure": true }
+        },
+        {
+            "name": "sanitizers",
+            "configurePreset": "sanitizers",
+            "configuration": "Debug",
             "output": { "outputOnFailure": true }
         }
     ]

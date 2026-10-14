@@ -5,6 +5,7 @@ A price-time-priority limit order book matching engine, written in C++23.
 [![Ubuntu CI](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-ubuntu.yml/badge.svg)](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-ubuntu.yml)
 [![macOS CI](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-macos.yml/badge.svg)](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-macos.yml)
 [![Windows CI](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-windows.yml/badge.svg)](https://github.com/filrichard/cpp-matching-engine/actions/workflows/ci-windows.yml)
+[![Sanitizers CI](https://github.com/filrichard/cpp-matching-engine/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/filrichard/cpp-matching-engine/actions/workflows/sanitizers.yml)
 
 ## Overview
 
