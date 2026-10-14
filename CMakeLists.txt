@@ -26,6 +26,29 @@ else()
     target_compile_options(matching_engine_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+option(MATCHING_ENGINE_ENABLE_SANITIZERS
+    "Enable AddressSanitizer and UndefinedBehaviorSanitizer"
+    OFF
+)
+
+if(MATCHING_ENGINE_ENABLE_SANITIZERS)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_library(matching_engine_sanitizers INTERFACE)
+        target_compile_options(matching_engine_sanitizers INTERFACE
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(matching_engine_sanitizers INTERFACE
+            -fsanitize=address,undefined
+        )
+        target_link_libraries(matching_engine_core PUBLIC matching_engine_sanitizers)
+    else()
+        message(FATAL_ERROR
+            "MATCHING_ENGINE_ENABLE_SANITIZERS requires GCC or Clang"
+        )
+    endif()
+endif()
+
 add_executable(matching_engine_app src/main.cpp)
 target_link_libraries(matching_engine_app PRIVATE matching_engine_core)
 
